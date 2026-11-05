@@ -14,3 +14,6 @@ mlruns/
 models/
 *.pkl
 *.joblib
+# Eval reports and exported model (regenerable)
+reports/
+model/

@@ -22,6 +22,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.svm import LinearSVC
 
+from inference import MODEL_NAME
+from inference import scores as get_scores
 from preprocess import clean_texts
 
 # ---------- Config (paths anchored to the repo, so cwd doesn't matter) ----------
@@ -32,7 +34,6 @@ DVC_FILE = ROOT / "data.dvc"
 PREPROCESS_PY = Path(__file__).resolve().parent / "preprocess.py"  # shipped with the model
 
 EXPERIMENT = "prompt-injection-tfidf"
-MODEL_NAME = "prompt-injection-detector"
 SPLIT_SEED = 42  # must match split.py
 SEED = 42
 
@@ -83,12 +84,6 @@ def build_pipe(feat, model) -> Pipeline:
         ("tfidf", TfidfVectorizer(sublinear_tf=True, lowercase=True, **feat)),
         ("clf", model),
     ])
-
-
-def get_scores(pipe, X):
-    if hasattr(pipe, "predict_proba"):
-        return pipe.predict_proba(X)[:, 1]
-    return pipe.decision_function(X)
 
 
 def evaluate(pipe, df, prefix):
@@ -174,7 +169,8 @@ def train_final(best, leaderboard, train, val, test):
             final, name="model",  # use artifact_path="model" on MLflow < 3
             signature=infer_signature(sample, final.predict(sample)),
             input_example=sample.tolist(),
-            code_paths=[str(PREPROCESS_PY)],  # lets the pickled pipeline import clean_texts
+            code_paths=[str(PREPROCESS_PY)],  # lets the saved pipeline import clean_texts
+            skops_trusted_types=["preprocess.clean_texts"],  # MLflow 3 saves via skops, which rejects custom fns otherwise
             registered_model_name=MODEL_NAME,
         )
         print(f"\nFINAL {best['run']}: test_f1={metrics['test_f1']:.4f}")
