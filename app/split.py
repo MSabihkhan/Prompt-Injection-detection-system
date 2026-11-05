@@ -5,8 +5,8 @@ from sklearn.model_selection import train_test_split
 
 
 def split_and_save(
-    path: str | Path = "../data/Raw/safeguard_all.csv",
-    out_dir: str | Path = "../data/Raw/splits",
+    path: str | Path = "../data/processed/clean.csv",
+    out_dir: str | Path = "../data/processed/splits",
     test_size: float = 0.15,
     val_size: float = 0.15,
     seed: int = 42,
