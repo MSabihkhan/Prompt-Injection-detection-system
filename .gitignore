@@ -1,0 +1,16 @@
+data/
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Secrets
+.env
+
+# MLOps artifacts
+mlruns/
+models/
+*.pkl
+*.joblib
