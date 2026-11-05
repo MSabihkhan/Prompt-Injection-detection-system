@@ -12,6 +12,16 @@ def clean_text(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+def clean_texts(X) -> list[str]:
+    """Batch version of clean_text, used as the first step of the model pipeline.
+
+    Accepts a list, Series, or single-column DataFrame (what MLflow pyfunc passes).
+    """
+    if getattr(X, "ndim", 1) == 2:
+        X = X.iloc[:, 0]
+    return [clean_text(str(s)) for s in X]
+
+
 def _drop_conflicts_and_dups(df: pd.DataFrame, key: str):
     """Drop every row whose key appears with both labels, then drop duplicate keys."""
     conflict = df.groupby(key)["label"].transform("nunique") > 1

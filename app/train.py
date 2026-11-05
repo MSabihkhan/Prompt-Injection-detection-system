@@ -19,13 +19,17 @@ from sklearn.metrics import (ConfusionMatrixDisplay, accuracy_score, f1_score,
                              precision_score, recall_score, roc_auc_score)
 from sklearn.naive_bayes import ComplementNB, MultinomialNB
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import FunctionTransformer
 from sklearn.svm import LinearSVC
+
+from preprocess import clean_texts
 
 # ---------- Config (paths anchored to the repo, so cwd doesn't matter) ----------
 ROOT = Path(__file__).resolve().parent.parent
 SPLITS = ROOT / "data" / "processed" / "splits"
 REPORT = ROOT / "data" / "processed" / "preprocess_report.json"
 DVC_FILE = ROOT / "data.dvc"
+PREPROCESS_PY = Path(__file__).resolve().parent / "preprocess.py"  # shipped with the model
 
 EXPERIMENT = "prompt-injection-tfidf"
 MODEL_NAME = "prompt-injection-detector"
@@ -75,6 +79,7 @@ def dvc_md5() -> str:
 
 def build_pipe(feat, model) -> Pipeline:
     return Pipeline([
+        ("clean", FunctionTransformer(clean_texts)),  # same cleaning at train and inference
         ("tfidf", TfidfVectorizer(sublinear_tf=True, lowercase=True, **feat)),
         ("clf", model),
     ])
@@ -169,6 +174,7 @@ def train_final(best, leaderboard, train, val, test):
             final, name="model",  # use artifact_path="model" on MLflow < 3
             signature=infer_signature(sample, final.predict(sample)),
             input_example=sample.tolist(),
+            code_paths=[str(PREPROCESS_PY)],  # lets the pickled pipeline import clean_texts
             registered_model_name=MODEL_NAME,
         )
         print(f"\nFINAL {best['run']}: test_f1={metrics['test_f1']:.4f}")
