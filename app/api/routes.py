@@ -2,8 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from .auth import require_api_key
 from .feedback_store import make_feedback_row
-from .schemas import (ClassifyBatchRequest, ClassifyBatchResponse, ClassifyRequest,
-                      ClassifyResponse, FeedbackRequest, FeedbackResponse, HealthResponse)
+from .schemas import (
+    ClassifyBatchRequest,
+    ClassifyBatchResponse,
+    ClassifyRequest,
+    ClassifyResponse,
+    FeedbackRequest,
+    FeedbackResponse,
+    HealthResponse,
+)
 
 router = APIRouter()
 

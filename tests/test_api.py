@@ -1,4 +1,6 @@
 """API tests with a stub Detector (no MLflow/model dependency)."""
+from typing import ClassVar
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -7,7 +9,7 @@ from app.api.main import app
 
 class StubDetector:
     threshold = 0.5
-    meta = {"version": "stub-1"}
+    meta: ClassVar[dict] = {"version": "stub-1"}
 
     def predict(self, texts):
         if isinstance(texts, str):
@@ -59,7 +61,6 @@ def test_classify_rejects_empty(client):
 
 
 def test_feedback_recorded(client, tmp_path, monkeypatch):
-    from app.api import feedback_store
 
     calls = []
     monkeypatch.setattr(app.state.feedback_store, "record", lambda row: calls.append(row))
