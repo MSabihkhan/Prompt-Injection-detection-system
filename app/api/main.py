@@ -35,18 +35,23 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 async def lifespan(app: FastAPI):
     app.state.model_name = MODEL_NAME
     app.state.feedback_store = get_feedback_store()
-    try:
-        import sys
-
-        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # app/ for `inference`
-        from inference import Detector
-
-        app.state.detector = Detector.load(MODEL_REF)
-        logger.info("Loaded detector %s (version=%s)", MODEL_REF, app.state.detector.meta.get("version"))
-    except Exception:
-        # Service still starts so /health reports the problem instead of crashing the container.
+    if os.environ.get("PROMPTGUARD_SKIP_MODEL_LOAD") == "1":
+        # Tests set this and inject their own stub detector; avoids a real registry round-trip
+        # (DagsHub is the only registry — no local fallback to load instead).
         app.state.detector = None
-        logger.exception("Failed to load detector '%s'; /classify will be unavailable", MODEL_REF)
+    else:
+        try:
+            import sys
+
+            sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # app/ for `inference`
+            from inference import Detector
+
+            app.state.detector = Detector.load(MODEL_REF)
+            logger.info("Loaded detector %s (version=%s)", MODEL_REF, app.state.detector.meta.get("version"))
+        except Exception:
+            # Service still starts so /health reports the problem instead of crashing the container.
+            app.state.detector = None
+            logger.exception("Failed to load detector '%s'; /classify will be unavailable", MODEL_REF)
     yield
 
 

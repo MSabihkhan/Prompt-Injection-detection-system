@@ -16,6 +16,10 @@ import json
 import sys
 import time
 
+from dotenv import load_dotenv
+
+load_dotenv()  # picks up MLFLOW_TRACKING_URI/USERNAME/PASSWORD from .env if present
+
 import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
@@ -28,8 +32,10 @@ from sklearn.metrics import (ConfusionMatrixDisplay, accuracy_score, average_pre
                              roc_auc_score)
 from sklearn.model_selection import StratifiedKFold, cross_val_predict
 
-from inference import MODEL_NAME, Detector, resolve_version
+from inference import MODEL_NAME, Detector, require_tracking_uri, resolve_version
 from train import EXPERIMENT, ROOT, SEED, SPLIT_SEED, SPLITS, dvc_md5
+
+require_tracking_uri()  # DagsHub is the only MLflow registry; fail fast if unset
 
 REPORTS = ROOT / "reports"
 CHAMPION = "champion"

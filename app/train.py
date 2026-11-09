@@ -4,6 +4,10 @@ import re
 import time
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()  # picks up MLFLOW_TRACKING_URI/USERNAME/PASSWORD from .env if present
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -22,9 +26,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.svm import LinearSVC
 
-from inference import MODEL_NAME
+from inference import MODEL_NAME, require_tracking_uri
 from inference import scores as get_scores
 from preprocess import clean_texts
+
+require_tracking_uri()  # DagsHub is the only MLflow registry; fail fast if unset
 
 # ---------- Config (paths anchored to the repo, so cwd doesn't matter) ----------
 ROOT = Path(__file__).resolve().parent.parent
