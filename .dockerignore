@@ -1,0 +1,14 @@
+.git
+.venv
+__pycache__
+*.pyc
+.ipynb_checkpoints
+data
+mlruns
+mlflow.db
+reports
+.env
+.env.example
+tests
+*.md
+Project Proposal.pdf

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PromptGuard demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 3rem auto; padding: 0 1rem; }
+    textarea { width: 100%; height: 6rem; font: inherit; }
+    button { margin-top: 0.5rem; padding: 0.5rem 1rem; }
+    #result { margin-top: 1rem; padding: 1rem; border-radius: 6px; display: none; }
+    .benign { background: #e6f4ea; }
+    .injection { background: #fce8e6; }
+    pre { white-space: pre-wrap; }
+    #flag-row { margin-top: 0.75rem; display: none; }
+    #flag-row button { margin-top: 0; margin-right: 0.5rem; background: none; border: 1px solid #888; border-radius: 4px; }
+    #flag-row button:disabled { opacity: 0.6; }
+    #flag-status { margin-top: 0.5rem; font-size: 0.9em; color: #555; }
+  </style>
+</head>
+<body>
+  <h1>PromptGuard</h1>
+  <p>Model: {{ model_name }}. Paste a prompt and check whether it looks like an injection attempt.</p>
+  <textarea id="text" placeholder="Enter a prompt..."></textarea><br>
+  <button id="submit">Classify</button>
+  <div id="result"></div>
+  <div id="flag-row">
+    <span>Was this correct?</span><br>
+    <button id="flag-correct">Correct</button>
+    <button id="flag-wrong">Wrong</button>
+  </div>
+  <div id="flag-status"></div>
+
+  <script>
+    let lastResult = null; // {text, predicted_label, model_version}
+
+    const resultBox = document.getElementById("result");
+    const flagRow = document.getElementById("flag-row");
+    const flagCorrectBtn = document.getElementById("flag-correct");
+    const flagWrongBtn = document.getElementById("flag-wrong");
+    const flagStatus = document.getElementById("flag-status");
+
+    document.getElementById("submit").addEventListener("click", async () => {
+      const text = document.getElementById("text").value;
+      if (!text.trim()) return;
+      resultBox.style.display = "block";
+      resultBox.className = "";
+      resultBox.textContent = "Checking...";
+      flagRow.style.display = "none";
+      flagStatus.textContent = "";
+      flagCorrectBtn.disabled = false;
+      flagWrongBtn.disabled = false;
+      lastResult = null;
+      try {
+        const res = await fetch("/classify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        const data = await res.json();
+        if (!res.ok) { resultBox.textContent = data.detail || "Error"; return; }
+        resultBox.className = data.is_injection ? "injection" : "benign";
+        resultBox.innerHTML = `<strong>${data.is_injection ? "Injection" : "Benign"}</strong>
+          (score ${data.score.toFixed(3)}, threshold ${data.threshold.toFixed(3)})`;
+        lastResult = { text, predicted_label: data.label, model_version: data.model_version };
+        flagRow.style.display = "block";
+      } catch (e) {
+        resultBox.textContent = "Request failed: " + e;
+      }
+    });
+
+    async function sendFeedback(wasCorrect) {
+      if (!lastResult) return;
+      flagCorrectBtn.disabled = true;
+      flagWrongBtn.disabled = true;
+      flagStatus.textContent = "Sending feedback...";
+      const correctLabel = wasCorrect ? lastResult.predicted_label : (lastResult.predicted_label === 1 ? 0 : 1);
+      try {
+        const res = await fetch("/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: lastResult.text,
+            predicted_label: lastResult.predicted_label,
+            correct_label: correctLabel,
+            model_version: lastResult.model_version,
+          }),
+        });
+        const data = await res.json();
+        flagStatus.textContent = res.ok ? "Thanks, feedback recorded." : (data.detail || "Failed to record feedback.");
+      } catch (e) {
+        flagCorrectBtn.disabled = false;
+        flagWrongBtn.disabled = false;
+        flagStatus.textContent = "Request failed: " + e;
+      }
+    }
+
+    flagCorrectBtn.addEventListener("click", () => sendFeedback(true));
+    flagWrongBtn.addEventListener("click", () => sendFeedback(false));
+  </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+pandas==3.1.1
+scikit-learn==1.9.1
+mlflow==3.18.0
+matplotlib==3.11.2
+numpy==2.5.4
+datasets==5.1.0
+dvc==3.67.1
+fastapi==0.162.2
+uvicorn==0.54.0
+jinja2==3.1.6
+pytest==9.2.0
+httpx==0.28.1
+supabase==2.34.1
+python-dotenv==1.2.4
+ruff==0.17.4

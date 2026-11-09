@@ -1,0 +1,11 @@
+# Local dev stack. Airflow omitted for now (not yet implemented in app/); add it here once
+# the retraining DAGs exist. Model must be exported first: see Dockerfile / CLAUDE.md.
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      PROMPTGUARD_MODEL: /app/model
