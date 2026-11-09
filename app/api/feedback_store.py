@@ -33,6 +33,7 @@ class SupabaseFeedbackStore:
         self.table = table
 
     def record(self, row: dict) -> None:
+        row = {k: v for k, v in row.items() if k != "created_at"}  # let the DB default it
         self.client.table(self.table).insert(row).execute()
 
 
@@ -43,11 +44,11 @@ def get_feedback_store() -> FeedbackStore:
     return LocalFileFeedbackStore()
 
 
-def make_feedback_row(text: str, predicted_label: int, correct_label: int, model_version: str | None) -> dict:
+def make_feedback_row(text: str, predicted_label: int, correct_label: int, model_version: str | int | None) -> dict:
     return {
         "text": text,
         "predicted_label": predicted_label,
         "correct_label": correct_label,
-        "model_version": model_version,
-        "created_at": time.time(),
+        "model_version": str(model_version) if model_version is not None else None,
+        "created_at": time.time(),  # used by the local-file fallback only
     }

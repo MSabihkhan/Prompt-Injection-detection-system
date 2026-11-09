@@ -3,7 +3,7 @@ import os
 
 from fastapi import Header, HTTPException, status
 
-API_KEY = os.environ.get("PROMPTGUARD_API_KEY")
+API_KEY = os.environ.get("PROMPTGUARD_API_KEY") or None  # blank .env value counts as unset
 
 
 async def require_api_key(x_api_key: str | None = Header(default=None)) -> None:

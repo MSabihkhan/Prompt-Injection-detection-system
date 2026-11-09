@@ -3,7 +3,7 @@ plus a minimal demo page.
 
 Run (from repo root):
     uvicorn app.api.main:app --reload
-Env:
+Env (read from .env in the repo root if present, via python-dotenv):
     PROMPTGUARD_MODEL   registry ref or local dir (default: champion)
     PROMPTGUARD_API_KEY required in X-API-Key header if set; unset disables auth (dev only)
     SUPABASE_URL / SUPABASE_KEY  feedback storage backend; falls back to a local file if unset
@@ -12,6 +12,11 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv()  # reads .env into os.environ; must run before reading env vars below or in
+                # feedback_store/auth (both read at import time, not request time)
 
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
@@ -22,7 +27,7 @@ from .routes import router
 logger = logging.getLogger("promptguard.api")
 
 MODEL_NAME = "prompt-injection-detector"
-MODEL_REF = os.environ.get("PROMPTGUARD_MODEL", "champion")
+MODEL_REF = os.environ.get("PROMPTGUARD_MODEL") or "champion"  # blank .env value counts as unset
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
 
