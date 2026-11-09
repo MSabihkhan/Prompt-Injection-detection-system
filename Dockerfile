@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 
 FROM base AS deps
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-compile -r requirements.txt
 
 FROM deps AS runtime
 COPY app/ app/
