@@ -180,7 +180,7 @@ def main(argv=None):
 
     client = MlflowClient()
     v = resolve_version(args.model, client)
-    det = Detector.from_registry(v.version)
+    det = Detector.from_registry(str(v.version))
     default_t = Detector(det.pipe).threshold  # ignore any previously stored threshold
     print(f"Evaluating {MODEL_NAME} v{v.version} ({det.score_type}, clean step: {det.has_clean_step})")
 

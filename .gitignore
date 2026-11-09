@@ -11,6 +11,7 @@ __pycache__/
 
 # MLOps artifacts
 mlruns/
+mlflow.db
 models/
 *.pkl
 *.joblib

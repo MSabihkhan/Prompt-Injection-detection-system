@@ -7,7 +7,9 @@ Python 3.11 · scikit-learn (TF-IDF baseline), Hugging Face Transformers/PyTorch
 
 ## Layout
 - `app/` — pipeline scripts: `datadownload.py` → `preprocess.py` → `split.py` → `train.py` → `eval.py`; `inference.py` loads/exports the model.
-- `data/` — DVC-tracked (`data.dvc`), gitignored. Never commit data, `mlruns/`, `model/`, `reports/`, `.env`.
+- `app/api/` — FastAPI service: `main.py` (app + lifespan model load), `routes.py`, `schemas.py`, `auth.py`, `feedback_store.py` (Supabase or local-file fallback), `templates/index.html` (demo page).
+- `tests/` — pytest, API tests use a stub `Detector` (no model/MLflow needed).
+- `data/` — DVC-tracked (`data.dvc`), gitignored. Never commit data, `mlruns/`, `mlflow.db`, `model/`, `reports/`, `.env`.
 
 ## Commands (run from repo root, venv `.venv`)
 - Install: `.venv/Scripts/python.exe -m pip install -r requirements.txt`
@@ -16,6 +18,8 @@ Python 3.11 · scikit-learn (TF-IDF baseline), Hugging Face Transformers/PyTorch
 - Evaluate and gate: `python app/eval.py [--model N] [--promote]` (exit 1 = gate failed; used by CI)
 - Predict: `python app/inference.py predict "text" --model champion`
 - Export for Docker: `python app/inference.py export --model champion --out model/`
+- Run API: `uvicorn app.api.main:app --reload` (env: `PROMPTGUARD_MODEL`, `PROMPTGUARD_API_KEY`, `SUPABASE_URL`/`SUPABASE_KEY`)
+- Test: `pytest`
 
 ## Invariants (do not break)
 - Use `preprocess.clean_texts` identically at train and inference.
