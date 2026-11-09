@@ -11,6 +11,9 @@
     .benign { background: #e6f4ea; }
     .injection { background: #fce8e6; }
     pre { white-space: pre-wrap; }
+    #flag { margin-top: 0.75rem; display: none; background: none; border: 1px solid #888; border-radius: 4px; }
+    #flag:disabled { opacity: 0.6; }
+    #flag-status { margin-top: 0.5rem; font-size: 0.9em; color: #555; }
   </style>
 </head>
 <body>
@@ -19,15 +22,26 @@
   <textarea id="text" placeholder="Enter a prompt..."></textarea><br>
   <button id="submit">Classify</button>
   <div id="result"></div>
+  <button id="flag">This prediction is wrong</button>
+  <div id="flag-status"></div>
 
   <script>
+    let lastResult = null; // {text, predicted_label, model_version}
+
+    const resultBox = document.getElementById("result");
+    const flagBtn = document.getElementById("flag");
+    const flagStatus = document.getElementById("flag-status");
+
     document.getElementById("submit").addEventListener("click", async () => {
       const text = document.getElementById("text").value;
-      const box = document.getElementById("result");
       if (!text.trim()) return;
-      box.style.display = "block";
-      box.className = "";
-      box.textContent = "Checking...";
+      resultBox.style.display = "block";
+      resultBox.className = "";
+      resultBox.textContent = "Checking...";
+      flagBtn.style.display = "none";
+      flagStatus.textContent = "";
+      flagBtn.disabled = false;
+      lastResult = null;
       try {
         const res = await fetch("/classify", {
           method: "POST",
@@ -35,12 +49,37 @@
           body: JSON.stringify({ text }),
         });
         const data = await res.json();
-        if (!res.ok) { box.textContent = data.detail || "Error"; return; }
-        box.className = data.is_injection ? "injection" : "benign";
-        box.innerHTML = `<strong>${data.is_injection ? "Injection" : "Benign"}</strong>
+        if (!res.ok) { resultBox.textContent = data.detail || "Error"; return; }
+        resultBox.className = data.is_injection ? "injection" : "benign";
+        resultBox.innerHTML = `<strong>${data.is_injection ? "Injection" : "Benign"}</strong>
           (score ${data.score.toFixed(3)}, threshold ${data.threshold.toFixed(3)})`;
+        lastResult = { text, predicted_label: data.label, model_version: data.model_version };
+        flagBtn.style.display = "inline-block";
       } catch (e) {
-        box.textContent = "Request failed: " + e;
+        resultBox.textContent = "Request failed: " + e;
+      }
+    });
+
+    flagBtn.addEventListener("click", async () => {
+      if (!lastResult) return;
+      flagBtn.disabled = true;
+      flagStatus.textContent = "Sending feedback...";
+      try {
+        const res = await fetch("/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: lastResult.text,
+            predicted_label: lastResult.predicted_label,
+            correct_label: lastResult.predicted_label === 1 ? 0 : 1,
+            model_version: lastResult.model_version,
+          }),
+        });
+        const data = await res.json();
+        flagStatus.textContent = res.ok ? "Thanks, feedback recorded." : (data.detail || "Failed to record feedback.");
+      } catch (e) {
+        flagBtn.disabled = false;
+        flagStatus.textContent = "Request failed: " + e;
       }
     });
   </script>
