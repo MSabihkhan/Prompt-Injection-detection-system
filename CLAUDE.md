@@ -13,7 +13,7 @@ Python 3.12 (proposal says 3.11; actual venv/Docker base is 3.12 — numpy==2.5.
 
 ## Commands (run from repo root, venv `.venv`)
 - Install: `.venv/Scripts/python.exe -m pip install -r requirements.txt`
-- MLflow registry is shared on DagsHub: `train.py`/`eval.py`/`inference.py` auto-load `.env` (python-dotenv) for `MLFLOW_TRACKING_URI`/`MLFLOW_TRACKING_USERNAME`/`MLFLOW_TRACKING_PASSWORD` (DagsHub token). See `.env.example`. Without these, MLflow falls back to a local `mlflow.db`.
+- MLflow registry is shared on DagsHub, no local fallback: `train.py`/`eval.py`/`inference.py` auto-load `.env` (python-dotenv) for `MLFLOW_TRACKING_URI`/`MLFLOW_TRACKING_USERNAME`/`MLFLOW_TRACKING_PASSWORD` (DagsHub token) and fail fast with a clear error if `MLFLOW_TRACKING_URI` is unset. See `.env.example`. (`inference.py`'s `from_dir` path — used by Docker — needs no registry at all.)
 - Pull data: `dvc pull`
 - Train: `python app/train.py`
 - Evaluate and gate: `python app/eval.py [--model N] [--promote]` (exit 1 = gate failed; used by CI)
@@ -37,7 +37,7 @@ Python 3.12 (proposal says 3.11; actual venv/Docker base is 3.12 — numpy==2.5.
 ## Docker / CI-CD
 - `Dockerfile`: python:3.12-slim, expects a pre-exported `model/` dir (run `python app/inference.py export --model champion --out model/` before `docker build`).
 - `docker-compose.yml`: API only for now; add MLflow/Airflow services once those are containerized.
-- `.github/workflows/ci.yml`: `test` job (ruff scoped to `app/api`/`tests`, + pytest) runs on every push/PR, no secrets needed. `docker` job (export champion from DagsHub MLflow, build image, run it, smoke-test `/health` + `/classify`) only runs once repo variable `MLFLOW_TRACKING_URI` and secrets `MLFLOW_TRACKING_USERNAME`/`MLFLOW_TRACKING_PASSWORD` are set; skips cleanly otherwise.
+- `.github/workflows/ci.yml`: `test` job (ruff scoped to `app/api`/`tests`, + pytest) runs on every push/PR, no secrets needed. `docker` job (export champion from DagsHub MLflow, build image, run it, smoke-test `/health` + `/classify`) always runs but skips its own steps cleanly if secrets `MLFLOW_TRACKING_URI`/`MLFLOW_TRACKING_USERNAME`/`MLFLOW_TRACKING_PASSWORD` aren't set (all three as repo **secrets**, Settings > Secrets and variables > Actions > Secrets tab).
 - `.github/workflows/cd.yml`: build/push to ECR, deploy to ECS, on push to `main`. **Disabled** (`if: false` on the job) until `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_REGION`/`ECR_REPOSITORY`/`ECS_CLUSTER`/`ECS_SERVICE` secrets and a remote `MLFLOW_TRACKING_URI` secret exist (MLflow is local-only right now). Flip `if: false` to enable once that infra is ready.
 
 ## Conventions

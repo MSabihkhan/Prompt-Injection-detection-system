@@ -28,34 +28,50 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     # Needs the shared DagsHub MLflow registry to export a real champion model. Set
-    # MLFLOW_TRACKING_USERNAME / MLFLOW_TRACKING_PASSWORD (a DagsHub token) as repo secrets;
-    # skips cleanly if they're not configured yet instead of failing the whole workflow.
-    if: ${{ vars.MLFLOW_TRACKING_URI != '' }}
+    # MLFLOW_TRACKING_URI, MLFLOW_TRACKING_USERNAME, MLFLOW_TRACKING_PASSWORD as repo secrets
+    # (Settings > Secrets and variables > Actions > Secrets tab, all three). The job always
+    # runs; the first step skips the rest cleanly if the URI secret isn't set yet.
     env:
-      MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI }}
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
       MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
       MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check MLflow registry is configured
+        id: check
+        run: |
+          if [ -z "$MLFLOW_TRACKING_URI" ]; then
+            echo "MLFLOW_TRACKING_URI secret not set — skipping Docker check."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-python@v5
+        if: steps.check.outputs.skip == 'false'
         with:
           python-version: "3.12"
           cache: pip
 
       - name: Install dependencies
+        if: steps.check.outputs.skip == 'false'
         run: pip install -r requirements.txt
 
       - name: Export champion model
+        if: steps.check.outputs.skip == 'false'
         run: python app/inference.py export --model champion --out model/
 
       - name: Build image
+        if: steps.check.outputs.skip == 'false'
         run: docker build -t promptguard-api:ci .
 
       - name: Run container
+        if: steps.check.outputs.skip == 'false'
         run: docker run -d --name promptguard-ci -p 8000:8000 promptguard-api:ci
 
       - name: Wait for health
+        if: steps.check.outputs.skip == 'false'
         run: |
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:8000/health; then exit 0; fi
@@ -64,6 +80,7 @@ jobs:
           echo "Service never became healthy"; docker logs promptguard-ci; exit 1
 
       - name: Smoke test /classify
+        if: steps.check.outputs.skip == 'false'
         run: |
           curl -sf -X POST http://127.0.0.1:8000/classify \
             -H "Content-Type: application/json" \
@@ -71,5 +88,5 @@ jobs:
           grep -q '"is_injection":true' /tmp/resp.json
 
       - name: Container logs (always)
-        if: always()
+        if: always() && steps.check.outputs.skip == 'false'
         run: docker logs promptguard-ci || true
