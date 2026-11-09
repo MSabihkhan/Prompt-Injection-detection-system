@@ -37,7 +37,7 @@ Python 3.12 (proposal says 3.11; actual venv/Docker base is 3.12 — numpy==2.5.
 - `Dockerfile`: python:3.12-slim, expects a pre-exported `model/` dir (run `python app/inference.py export --model champion --out model/` before `docker build`).
 - `docker-compose.yml`: API only for now; add MLflow/Airflow services once those are containerized.
 - `.github/workflows/ci.yml`: ruff (scoped to `app/api`, `tests`) + pytest, on every push/PR. Runs today, no secrets needed.
-- `.github/workflows/cd.yml`: build/push to ECR, deploy to ECS, on push to `main`. **Not active** — needs `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_REGION`/`ECR_REPOSITORY`/`ECS_CLUSTER`/`ECS_SERVICE` secrets and a remote `MLFLOW_TRACKING_URI` secret (MLflow is local-only right now), none of which exist yet.
+- `.github/workflows/cd.yml`: build/push to ECR, deploy to ECS, on push to `main`. **Disabled** (`if: false` on the job) until `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_REGION`/`ECR_REPOSITORY`/`ECS_CLUSTER`/`ECS_SERVICE` secrets and a remote `MLFLOW_TRACKING_URI` secret exist (MLflow is local-only right now). Flip `if: false` to enable once that infra is ready.
 
 ## Conventions
 - Paths anchored with `Path(__file__)`, not cwd.
