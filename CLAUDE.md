@@ -43,6 +43,7 @@ Python 3.12 (proposal says 3.11; actual venv/Docker base is 3.12 — numpy==2.5.
 - Paths anchored with `Path(__file__)`, not cwd.
 - Keep changes minimal; extend existing modules before adding new ones. Add pytest tests for new API/pipeline code. Run `pytest` before commit.
 - Commit only when asked.
+- No AI attribution/co-author lines in commit messages or PR descriptions (no `Co-Authored-By: Claude...`, no "Generated with Claude Code" footer). Human authorship only.
 
 ## Team ownership
 Sabih: data + preprocessing, DVC push to DagsHub · Munam: API, DB (Supabase), tests, CI/CD · Fatima: Airflow/config, Grafana dashboard. Check before editing another owner's area.
