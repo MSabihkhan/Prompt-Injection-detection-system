@@ -8,6 +8,7 @@ __pycache__/
 
 # Secrets
 .env
+supabase/schema.sql
 
 # MLOps artifacts
 mlruns/
