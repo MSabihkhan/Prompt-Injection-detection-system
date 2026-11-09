@@ -14,6 +14,10 @@ import shutil
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()  # picks up MLFLOW_TRACKING_URI/USERNAME/PASSWORD from .env if present
+
 import mlflow
 import mlflow.sklearn
 import numpy as np
@@ -24,6 +28,19 @@ from preprocess import clean_texts
 
 MODEL_NAME = "prompt-injection-detector"
 META_FILE = "detector.json"  # written next to MLmodel by `export`
+
+
+def require_tracking_uri() -> None:
+    """DagsHub is the only MLflow registry — no local mlflow.db/mlruns fallback. Call this
+    before any registry contact (never before `from_dir`, which needs no registry at all)."""
+    import os
+
+    if not os.environ.get("MLFLOW_TRACKING_URI"):
+        raise RuntimeError(
+            "MLFLOW_TRACKING_URI is not set. This project uses the shared DagsHub MLflow "
+            "registry only — set MLFLOW_TRACKING_URI/MLFLOW_TRACKING_USERNAME/"
+            "MLFLOW_TRACKING_PASSWORD in .env (see .env.example)."
+        )
 
 
 # ---------- Scoring helpers (shared with train.py / eval.py) ----------
@@ -80,6 +97,7 @@ class Detector:
 
     @classmethod
     def from_registry(cls, ref: str = "champion"):
+        require_tracking_uri()
         v = resolve_version(ref)
         pipe = mlflow.sklearn.load_model(f"models:/{MODEL_NAME}/{v.version}")
         meta = {"model_name": MODEL_NAME, "version": v.version, "run_id": v.run_id, **v.tags}
