@@ -1,0 +1,63 @@
+# Deploy to AWS on merge to main. NOT YET ACTIVE: requires the following GitHub Secrets,
+# none of which exist yet (AWS ECR/ECS resources haven't been provisioned):
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
+#   ECR_REPOSITORY, ECS_CLUSTER, ECS_SERVICE
+# Also requires a remote MLflow registry reachable from CI (currently local-only), since the
+# model-export step below resolves "champion" from the registry. Until both exist, this
+# workflow will fail at the "Configure AWS credentials" step rather than deploying something
+# broken, so it is intentionally left enabled rather than disabled — CI should gate on
+# needing the secrets, not on this file. If you want it fully inert until infra lands, add
+# `if: false` to the deploy job or delete this file and recreate it when ready.
+name: CD
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    needs: []
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Export champion model
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+        run: python app/inference.py export --model champion --out model/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" -t "$REGISTRY/$REPOSITORY:latest" .
+          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          docker push "$REGISTRY/$REPOSITORY:latest"
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service \
+            --cluster "${{ secrets.ECS_CLUSTER }}" \
+            --service "${{ secrets.ECS_SERVICE }}" \
+            --force-new-deployment
