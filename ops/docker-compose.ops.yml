@@ -1,0 +1,69 @@
+# Ops stack: Grafana + Airflow (+ optional local Postgres for development).
+#
+#   Local fake-data mode:  docker compose -f ops/docker-compose.ops.yml --env-file ops/.env.ops --profile local-db up -d --build
+#   Supabase mode:         docker compose -f ops/docker-compose.ops.yml --env-file ops/.env.ops up -d --build
+#
+# Grafana  -> http://localhost:3000   (login from GRAFANA_USER / GRAFANA_PASSWORD)
+# Airflow  -> http://localhost:8080   (user "admin"; password is printed in `docker logs promptguard-airflow`)
+name: promptguard-ops
+
+services:
+  postgres:
+    image: postgres:16
+    profiles: ["local-db"]
+    environment:
+      POSTGRES_USER: ${PG_USER:-pg}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-pg}
+      POSTGRES_DB: ${PG_DB:-promptguard}
+    ports:
+      - "5433:5432"          # host port 5433 so it never clashes with a Postgres you already run
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d:ro
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: promptguard-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      PG_HOST: ${PG_HOST:-postgres}
+      PG_PORT: ${PG_PORT:-5432}
+      PG_DB: ${PG_DB:-promptguard}
+      PG_USER: ${PG_USER:-pg}
+      PG_PASSWORD: ${PG_PASSWORD:-pg}
+      PG_SSLMODE: ${PG_SSLMODE:-disable}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+
+  airflow:
+    build:
+      context: ..
+      dockerfile: ops/airflow/Dockerfile
+    container_name: promptguard-airflow
+    command: standalone      # one container: webserver + scheduler + sqlite. Fine for a course project.
+    ports:
+      - "8080:8080"
+    env_file:
+      - ../.env              # MLFLOW_*, SUPABASE_*  (copy .env.example to .env first)
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/repo/ops/airflow/dags
+      PG_REPO: /opt/airflow/repo
+      PG_PY: /home/airflow/pg-venv/bin/python
+      EVIDENTLY_PY: /home/airflow/ev-venv/bin/python
+      DATABASE_URL: postgresql://${PG_USER:-pg}:${PG_PASSWORD:-pg}@${PG_HOST:-postgres}:${PG_PORT:-5432}/${PG_DB:-promptguard}?sslmode=${PG_SSLMODE:-disable}
+      DAGSHUB_USER: ${DAGSHUB_USER:-}
+      DAGSHUB_TOKEN: ${DAGSHUB_TOKEN:-}
+    volumes:
+      - ..:/opt/airflow/repo
+      - airflowdata:/opt/airflow
+
+volumes:
+  pgdata:
+  grafanadata:
+  airflowdata:

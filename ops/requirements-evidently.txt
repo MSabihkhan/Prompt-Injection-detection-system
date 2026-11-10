@@ -1,0 +1,4 @@
+# Separate venv just for the Evidently HTML report (needs pandas 2.x).
+pandas<3
+numpy<2.3
+evidently==0.7.23
