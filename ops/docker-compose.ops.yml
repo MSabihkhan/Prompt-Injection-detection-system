@@ -56,7 +56,12 @@ services:
       PG_REPO: /opt/airflow/repo
       PG_PY: /home/airflow/pg-venv/bin/python
       EVIDENTLY_PY: /home/airflow/ev-venv/bin/python
-      DATABASE_URL: postgresql://${PG_USER:-pg}:${PG_PASSWORD:-pg}@${PG_HOST:-postgres}:${PG_PORT:-5432}/${PG_DB:-promptguard}?sslmode=${PG_SSLMODE:-disable}
+      PG_HOST: ${PG_HOST:-postgres}
+      PG_PORT: ${PG_PORT:-5432}
+      PG_DB: ${PG_DB:-promptguard}
+      PG_USER: ${PG_USER:-pg}
+      PG_PASSWORD: ${PG_PASSWORD:-pg}
+      PG_SSLMODE: ${PG_SSLMODE:-disable}
       DAGSHUB_USER: ${DAGSHUB_USER:-}
       DAGSHUB_TOKEN: ${DAGSHUB_TOKEN:-}
     volumes:
