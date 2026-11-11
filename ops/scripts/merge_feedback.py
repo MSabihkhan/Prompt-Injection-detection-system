@@ -7,7 +7,7 @@ Rules (they protect the project's invariants):
   * for a text already in train, the feedback label wins
   * the original train.csv is backed up once as train.base.csv
 
-    python -m ops.scripts.merge_feedback --feedback data/processed/feedback.csv
+    python -m ops.scripts.merge_feedback --feedback reports/feedback.csv
 """
 import argparse
 import sys
@@ -45,7 +45,7 @@ def merge(train: pd.DataFrame, holdout_texts: set, feedback: pd.DataFrame) -> tu
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--feedback", default="data/processed/feedback.csv")
+    ap.add_argument("--feedback", default="reports/feedback.csv")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
 

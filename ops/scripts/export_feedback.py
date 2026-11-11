@@ -6,7 +6,7 @@ uses to decide whether a retrain is worth running.
 Only `text` and `correct_label` are required in the feedback table. The time column is detected
 (created_at, timestamp, ...) so a small naming difference does not break the export.
 
-    python -m ops.scripts.export_feedback --out data/processed/feedback.csv
+    python -m ops.scripts.export_feedback --out reports/feedback.csv
 """
 import argparse
 
@@ -29,7 +29,7 @@ def pick_time_column(columns):
 def main(argv=None) -> int:
     cfg = load_config()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", default="data/processed/feedback.csv")
+    ap.add_argument("--out", default="reports/feedback.csv")
     ap.add_argument("--days", type=int, default=cfg["retrain"]["feedback_since_days"])
     args = ap.parse_args(argv)
 

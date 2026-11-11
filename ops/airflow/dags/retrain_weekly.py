@@ -46,7 +46,7 @@ with DAG(
 ) as dag:
     export_feedback = BashOperator(
         task_id="export_feedback",
-        bash_command=CD + f"{PY} -m ops.scripts.export_feedback --out data/processed/feedback.csv",
+        bash_command=CD + f"{PY} -m ops.scripts.export_feedback --out reports/feedback.csv",
     )
     enough_feedback = ShortCircuitOperator(task_id="enough_feedback", python_callable=_enough_feedback)
 
@@ -57,11 +57,11 @@ with DAG(
         + f"{VBIN}/dvc remote modify --local origin auth basic && "
         + f"{VBIN}/dvc remote modify --local origin user \"$DAGSHUB_USER\" && "
         + f"{VBIN}/dvc remote modify --local origin password \"$DAGSHUB_TOKEN\" && "
-        + f"{VBIN}/dvc pull",
+        + f"{VBIN}/dvc pull --force",  # --force: data/ must match the committed version; the merge step re-applies feedback each run
     )
     merge_feedback = BashOperator(
         task_id="merge_feedback",
-        bash_command=CD + f"{PY} -m ops.scripts.merge_feedback --feedback data/processed/feedback.csv",
+        bash_command=CD + f"{PY} -m ops.scripts.merge_feedback --feedback reports/feedback.csv",
     )
     train = BashOperator(task_id="train", bash_command=CD + f"{PY} app/train.py")
 
