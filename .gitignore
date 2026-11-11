@@ -19,3 +19,7 @@ models/
 # Eval reports and exported model (regenerable)
 reports/
 model/
+
+ops/.env.ops
+
+.venv-evidently

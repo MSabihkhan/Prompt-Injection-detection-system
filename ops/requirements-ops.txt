@@ -1,0 +1,5 @@
+# Extra packages for the ops side (on top of requirements.txt)
+psycopg2-binary==2.9.10
+PyYAML==6.0.3
+scipy==1.18.1
+# Evidently is NOT installed here: it needs pandas<3. See ops/monitoring/evidently_report.py.

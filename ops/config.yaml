@@ -1,0 +1,20 @@
+# Central settings for the ops side (Airflow DAGs, drift check, scripts).
+# Change values here, not inside the code. Secrets do NOT go here (use .env).
+
+drift:
+  window_days: 1            # compare the last N days of predictions with the reference
+  min_current_rows: 50      # fewer rows than this -> "insufficient_data", never triggers a retrain
+  ks_alpha: 0.01            # KS test: p-value below this counts as a shift
+  psi_threshold: 0.2        # PSI at/above this counts as a shift (0.1 small, 0.2 moderate, 0.25+ large)
+  features: [text_length, score]
+  reference_path: reports/drift_reference.csv
+
+retrain:
+  schedule: "0 3 * * 0"     # weekly, Sunday 03:00 UTC
+  min_feedback_rows: 20     # skip the scheduled run if fewer new feedback rows than this
+  feedback_since_days: 30   # only use feedback from the last N days
+  promote: false            # SAFE DEFAULT: evaluate only. Set true to let a winning model become 'champion'
+                            # in the shared DagsHub registry (agree with the team first).
+
+airflow:
+  drift_schedule: "0 2 * * *"   # daily, 02:00 UTC
