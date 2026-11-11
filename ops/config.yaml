@@ -13,6 +13,8 @@ retrain:
   schedule: "0 3 * * 0"     # weekly, Sunday 03:00 UTC
   min_feedback_rows: 20     # skip the scheduled run if fewer new feedback rows than this
   feedback_since_days: 30   # only use feedback from the last N days
+  promote: false            # SAFE DEFAULT: evaluate only. Set true to let a winning model become 'champion'
+                            # in the shared DagsHub registry (agree with the team first).
 
 airflow:
   drift_schedule: "0 2 * * *"   # daily, 02:00 UTC

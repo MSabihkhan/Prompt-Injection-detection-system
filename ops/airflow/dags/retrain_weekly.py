@@ -23,6 +23,7 @@ from ops.config import load_config
 
 CFG = load_config()
 CD = f"cd {REPO} && "
+PROMOTE_FLAG = "--promote" if CFG["retrain"].get("promote") else ""
 
 
 def _enough_feedback(ti, dag_run, **_) -> bool:
@@ -69,7 +70,7 @@ with DAG(
     evaluate_promote = BashOperator(
         task_id="evaluate_promote",
         bash_command=CD + f"""
-        out=$({PY} app/eval.py --model latest --promote 2>&1); rc=$?
+        out=$({PY} app/eval.py --model latest {PROMOTE_FLAG} 2>&1); rc=$?
         echo "$out"
         if [ $rc -ne 0 ] && [ $rc -ne 1 ]; then exit $rc; fi
         if echo "$out" | grep -q "^Promoted"; then echo PROMOTED; else echo NOT_PROMOTED; fi
