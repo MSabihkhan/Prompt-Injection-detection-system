@@ -3,10 +3,12 @@ from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+PROCESSED = Path(__file__).resolve().parent.parent / "data" / "processed"
+
 
 def split_and_save(
-    path: str | Path = "../data/processed/clean.csv",
-    out_dir: str | Path = "../data/processed/splits",
+    path: str | Path = PROCESSED / "clean.csv",
+    out_dir: str | Path = PROCESSED / "splits",
     test_size: float = 0.15,
     val_size: float = 0.15,
     seed: int = 42,

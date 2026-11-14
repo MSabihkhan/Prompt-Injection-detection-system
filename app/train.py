@@ -1,6 +1,5 @@
 """Train prompt-injection classifiers: sweep on val, refit best on train+val, score test once."""
 import json
-import re
 import time
 from pathlib import Path
 
@@ -15,6 +14,7 @@ import matplotlib.pyplot as plt
 import mlflow
 import mlflow.sklearn
 import pandas as pd
+import yaml
 from mlflow.models import infer_signature
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -36,7 +36,8 @@ require_tracking_uri()  # DagsHub is the only MLflow registry; fail fast if unse
 ROOT = Path(__file__).resolve().parent.parent
 SPLITS = ROOT / "data" / "processed" / "splits"
 REPORT = ROOT / "data" / "processed" / "preprocess_report.json"
-DVC_FILE = ROOT / "data.dvc"
+DVC_LOCK = ROOT / "dvc.lock"
+SUMMARY = ROOT / "reports" / "train.json"  # DVC output of the train stage; eval depends on it
 PREPROCESS_PY = Path(__file__).resolve().parent / "preprocess.py"  # shipped with the model
 
 EXPERIMENT = "prompt-injection-tfidf"
@@ -80,8 +81,11 @@ EXPERIMENTS = [
 
 
 def dvc_md5() -> str:
-    m = re.search(r"md5:\s*([0-9a-f]+)", DVC_FILE.read_text()) if DVC_FILE.exists() else None
-    return m.group(1) if m else "unknown"
+    """md5 of the train/val/test splits as recorded by the `split` stage in dvc.lock."""
+    if not DVC_LOCK.exists():
+        return "unknown"
+    outs = yaml.safe_load(DVC_LOCK.read_text()).get("stages", {}).get("split", {}).get("outs", [])
+    return next((o["md5"] for o in outs if o["path"] == "data/processed/splits"), "unknown")
 
 
 def build_pipe(feat, model) -> Pipeline:
@@ -159,7 +163,7 @@ def train_final(best, leaderboard, train, val, test):
     train_val = pd.concat([train, val], ignore_index=True)
     final.fit(train_val["text"], train_val["label"])
 
-    with mlflow.start_run(run_name=f"FINAL_{best['run']}"):
+    with mlflow.start_run(run_name=f"FINAL_{best['run']}") as run:
         mlflow.set_tags({"data_dvc_md5": dvc_md5(), "split_seed": str(SPLIT_SEED),
                          "stage": "final", "selected_from": best["run_id"]})
         mlflow.log_dict(REPORT_DATA, "preprocess_report.json")
@@ -171,7 +175,7 @@ def train_final(best, leaderboard, train, val, test):
         log_cm(test, preds, "confusion_matrix_test.png")
 
         sample = train_val["text"].head(5)
-        mlflow.sklearn.log_model(
+        info = mlflow.sklearn.log_model(
             final, name="model",  # use artifact_path="model" on MLflow < 3
             signature=infer_signature(sample, final.predict(sample)),
             input_example=sample.tolist(),
@@ -180,6 +184,13 @@ def train_final(best, leaderboard, train, val, test):
             registered_model_name=MODEL_NAME,
         )
         print(f"\nFINAL {best['run']}: test_f1={metrics['test_f1']:.4f}")
+
+    SUMMARY.parent.mkdir(parents=True, exist_ok=True)
+    SUMMARY.write_text(json.dumps({
+        "model": best["run"], "run_id": run.info.run_id,
+        "registered_version": str(info.registered_model_version),
+        "data_dvc_md5": dvc_md5(), **metrics,
+    }, indent=2))
 
 
 def main():

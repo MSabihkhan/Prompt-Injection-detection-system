@@ -75,6 +75,7 @@ dvc pull
 
 | Task | Command |
 |---|---|
+| Reproduce the whole pipeline | `dvc repro` (download → preprocess → split → validate → train → eval) |
 | Train | `python app/train.py` |
 | Evaluate, gate and promote | `python app/eval.py --promote` |
 | Predict from the CLI | `python app/inference.py predict "text" --model champion` |
@@ -88,7 +89,7 @@ Without Supabase credentials the API writes to local JSONL files in `reports/` i
 ## Repository layout
 
 ```
-app/            data -> preprocess -> split -> train -> eval pipeline; inference.py loads/exports models
+app/            download -> preprocess -> split -> validate -> train -> eval (stages in dvc.yaml)
 app/api/        FastAPI service (routes, schemas, auth, store, demo page)
 ops/            Airflow DAGs, drift check, Grafana dashboard, SQL schema, config
 tests/          pytest suite (API tests use a stub model, no registry needed)

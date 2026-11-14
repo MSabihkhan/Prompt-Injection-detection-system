@@ -1,0 +1,56 @@
+# Full pipeline: `dvc repro` (needs .env with MLflow/DagsHub credentials for train/eval).
+# Data outputs are cached and pushed to the DagsHub remote with `dvc push`.
+stages:
+  download:
+    cmd: python app/datadownload.py
+    deps:
+      - app/datadownload.py
+    outs:
+      - data/Raw/safeguard_all.csv
+
+  preprocess:
+    cmd: python app/preprocess.py
+    deps:
+      - app/preprocess.py
+      - data/Raw/safeguard_all.csv
+    outs:
+      - data/processed/clean.csv
+    metrics:
+      - data/processed/preprocess_report.json:
+          cache: false
+
+  split:
+    cmd: python app/split.py
+    deps:
+      - app/split.py
+      - data/processed/clean.csv
+    outs:
+      - data/processed/splits
+
+  validate:
+    cmd: python app/validate.py
+    deps:
+      - app/validate.py
+      - data/processed/splits
+    metrics:
+      - data/processed/validation.json:
+          cache: false
+
+  train:
+    cmd: python app/train.py
+    deps:
+      - app/train.py
+      - app/inference.py
+      - app/preprocess.py
+      - data/processed/splits
+      - data/processed/preprocess_report.json
+      - data/processed/validation.json
+    metrics:
+      - reports/train.json:
+          cache: false
+
+  eval:
+    cmd: python app/eval.py --model latest
+    deps:
+      - app/eval.py
+      - reports/train.json

@@ -5,6 +5,8 @@ from pathlib import Path
 import json
 import pandas as pd
 
+DATA = Path(__file__).resolve().parent.parent / "data"
+
 
 def clean_text(s: str) -> str:
     """NFKC-normalize and collapse whitespace. Reuse this exact function at inference."""
@@ -34,8 +36,8 @@ def _drop_conflicts_and_dups(df: pd.DataFrame, key: str):
 
 
 def preprocess(
-    path: str | Path = "../data/Raw/safeguard_all.csv",
-    out_path: str | Path | None = "../data/processed/clean.csv",
+    path: str | Path = DATA / "Raw" / "safeguard_all.csv",
+    out_path: str | Path | None = DATA / "processed" / "clean.csv",
 ):
     df = pd.read_csv(path)
     report = {"rows_raw": len(df)}
@@ -80,7 +82,6 @@ def preprocess(
 
 if __name__ == "__main__":
     _, report = preprocess()
-    Path("../data/processed").mkdir(parents=True, exist_ok=True)
-    Path("../data/processed/preprocess_report.json").write_text(json.dumps(report, indent=2))
+    (DATA / "processed" / "preprocess_report.json").write_text(json.dumps(report, indent=2))
     for k, v in report.items():
         print(f"{k}: {v}")

@@ -55,7 +55,15 @@ Open http://localhost:8080. Trigger `drift_daily` by hand first (it needs the re
 then `retrain_weekly` with config `{"force": true}`.
 
 ### Step 4: Real Supabase
-1. Supabase -> SQL editor -> paste `ops/sql/001_schema.sql`.
+1. Supabase -> SQL editor -> paste `ops/sql/001_schema.sql`. Then grant the API's role access and turn on Row
+   Level Security (the schema file does neither; without the grants the API gets "permission denied"):
+   ```sql
+   grant select, insert on public.predictions, public.drift_runs, public.feedback to service_role;
+   grant usage, select on sequence predictions_id_seq, drift_runs_id_seq, feedback_id_seq to service_role;
+   alter table public.predictions enable row level security;
+   alter table public.drift_runs enable row level security;
+   alter table public.feedback enable row level security;
+   ```
 2. Supabase -> Connect -> **Session pooler** string (works over IPv4). Put the parts into `ops/.env.ops` (PG_*)
    and the full URL into `.env` as `DATABASE_URL`.
 3. Restart without `--profile local-db`.
@@ -75,19 +83,28 @@ Then add to `.env`: `EVIDENTLY_PY=C:\path\to\project\.venv-evidently\Scripts\pyt
 Inside Docker this is already set up (`/home/airflow/ev-venv`). Without it the drift check still works;
 `report_written` is just false.
 
-## 4. Decisions to agree with the team
+## 4. Team decisions
 
-1. **Who writes `predictions`?** The API must insert one row per classification (no prompt text) using the
-   columns in `001_schema.sql`. Ask Munam. Without it Grafana and drift have nothing to read.
-2. **Feedback table shape.** `feedback(text, predicted_label, correct_label, model_version, created_at)` is assumed.
-   Compare with Munam's real schema (`supabase/schema.sql` is gitignored, so it is not in the repo) and adjust
-   `export_feedback.py` if names differ.
-3. **DVC versioning of retrained data.** `merge_feedback.py` changes `train.csv` only inside the container.
-   `train.py` records the md5 from `data.dvc`, so a merged model's recorded data version won't match its data.
-   Ask Sabih whether retraining should `dvc add` + `dvc push` a new data version.
-4. **Redeploy after promotion.** The DAG exports the new champion to `model/`; shipping it is Munam's CD.
+1. **Who writes `predictions`? Done.** The API (`app/api/routes.py`) inserts one row per classification from
+   `/classify` and `/classify/batch`: label, score, threshold, `text_length`, `latency_ms`, model version, no
+   prompt text. It runs as a background task, so a DB outage never fails a request. `GET /drift` returns recent
+   `drift_runs` rows.
+2. **Feedback table. Settled.** The shape in `001_schema.sql` matches what the API used, so `export_feedback.py`
+   needs no change. Users no longer submit feedback: the `/feedback` route and the demo page's Correct/Wrong
+   buttons were removed. The table stays because retraining reads it. A planned LLM judge will write rows where
+   it disagrees with the model.
+3. **DVC versioning of retrained data. Still open.** The data now comes from a DVC pipeline (`dvc.yaml`, stages
+   download → preprocess → split → validate → train → eval; `data.dvc` is gone). `dvc pull --force` in the DAG
+   works the same way once `dvc push` has been run. `train.py` now records the md5 of the `split` stage output
+   from `dvc.lock`. `merge_feedback.py` still changes `train.csv` inside the container after the pull, so a
+   retrained model's recorded data version won't match its actual data. Options: make feedback merging a DVC
+   stage before `train`, or have retraining `dvc push` a new data version. Agree with Sabih.
+4. **Redeploy after promotion.** The DAG exports the new champion to `model/`. Shipping it is the CD workflow
+   (`.github/workflows/cd.yml`), which now targets Azure Container Apps and is disabled until the Azure
+   resources exist.
 5. **Score range.** If the champion uses a decision-function score (not 0..1), the dashboard histogram and
-   fake data still work, but PSI/KS operate on whatever scale the model produces. That is fine.
+   fake data still work, but PSI/KS operate on whatever scale the model produces. That is fine. The current
+   champion family (`linearsvc_char`) does produce margins, not probabilities.
 
 ## 5. Not tested yet
 

@@ -1,0 +1,112 @@
+schema: '2.0'
+stages:
+  download:
+    cmd: python app/datadownload.py
+    deps:
+    - path: app/datadownload.py
+      hash: md5
+      md5: b069375e120bf0e30318e561cbd1efbc
+      size: 776
+    outs:
+    - path: data/Raw/safeguard_all.csv
+      hash: md5
+      md5: 317172b2449971fe1508544737b29616
+      size: 4004657
+  preprocess:
+    cmd: python app/preprocess.py
+    deps:
+    - path: app/preprocess.py
+      hash: md5
+      md5: 0c02a58f6a5e894064b8612ea48fd8cd
+      size: 2978
+    - path: data/Raw/safeguard_all.csv
+      hash: md5
+      md5: 317172b2449971fe1508544737b29616
+      size: 4004657
+    outs:
+    - path: data/processed/clean.csv
+      hash: md5
+      md5: 268d38393e72382f46ac92904b9740fa
+      size: 3944223
+    - path: data/processed/preprocess_report.json
+      hash: md5
+      md5: 6890d9e003ed166946eb7a7ad73b9b04
+      size: 265
+  split:
+    cmd: python app/split.py
+    deps:
+    - path: app/split.py
+      hash: md5
+      md5: bcc2866f487647c74c74898afb6ad6e3
+      size: 1316
+    - path: data/processed/clean.csv
+      hash: md5
+      md5: 268d38393e72382f46ac92904b9740fa
+      size: 3944223
+    outs:
+    - path: data/processed/splits
+      hash: md5
+      md5: 1e7a9aebe36b705e5f17250c799a0576.dir
+      size: 3944247
+      nfiles: 3
+  validate:
+    cmd: python app/validate.py
+    deps:
+    - path: app/validate.py
+      hash: md5
+      md5: 6d62fff8e58c37b3205037b49d5486c0
+      size: 2010
+    - path: data/processed/splits
+      hash: md5
+      md5: 1e7a9aebe36b705e5f17250c799a0576.dir
+      size: 3944247
+      nfiles: 3
+    outs:
+    - path: data/processed/validation.json
+      hash: md5
+      md5: 50220d5d5a38b60584798da599bdbc09
+      size: 693
+  train:
+    cmd: python app/train.py
+    deps:
+    - path: app/inference.py
+      hash: md5
+      md5: f26b2b50e5a333a83fa1aa9dac47c5cd
+      size: 7548
+    - path: app/preprocess.py
+      hash: md5
+      md5: 0c02a58f6a5e894064b8612ea48fd8cd
+      size: 2978
+    - path: app/train.py
+      hash: md5
+      md5: fe65643909ba2b356abeb5640372a77f
+      size: 8751
+    - path: data/processed/preprocess_report.json
+      hash: md5
+      md5: 6890d9e003ed166946eb7a7ad73b9b04
+      size: 265
+    - path: data/processed/splits
+      hash: md5
+      md5: 1e7a9aebe36b705e5f17250c799a0576.dir
+      size: 3944247
+      nfiles: 3
+    - path: data/processed/validation.json
+      hash: md5
+      md5: 50220d5d5a38b60584798da599bdbc09
+      size: 693
+    outs:
+    - path: reports/train.json
+      hash: md5
+      md5: 8892c97774004dd14746fdd700f7de03
+      size: 363
+  eval:
+    cmd: python app/eval.py --model latest
+    deps:
+    - path: app/eval.py
+      hash: md5
+      md5: 5da0bf67812fea7054f138b02831940a
+      size: 14454
+    - path: reports/train.json
+      hash: md5
+      md5: 8892c97774004dd14746fdd700f7de03
+      size: 363

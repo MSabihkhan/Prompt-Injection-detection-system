@@ -6,15 +6,17 @@ Prompt injection detector: text classifier (benign/injection) + score, served by
 Python 3.12 (proposal says 3.11; actual venv/Docker base is 3.12 — numpy==2.5.4 requires it) · scikit-learn (TF-IDF baseline), Hugging Face Transformers/PyTorch (pretrained model, planned) · DVC (remote: DagsHub) · MLflow registry (shared, hosted on DagsHub — see Commands) · FastAPI/Uvicorn/Jinja2 · Docker + Compose · GitHub Actions · Azure (Container Apps, Container Registry, Key Vault) · Airflow · Evidently + Grafana (monitoring/dashboards) · Supabase (DB) · pytest.
 
 ## Layout
-- `app/` — pipeline scripts: `datadownload.py` → `preprocess.py` → `split.py` → `train.py` → `eval.py`; `inference.py` loads/exports the model.
+- `app/` — pipeline scripts: `datadownload.py` → `preprocess.py` → `split.py` → `validate.py` → `train.py` → `eval.py` (stages `download` → `preprocess` → `split` → `validate` → `train` → `eval` in `dvc.yaml`); `inference.py` loads/exports the model.
 - `app/api/` — FastAPI service: `main.py` (app + lifespan model load), `routes.py`, `schemas.py`, `auth.py`, `store.py` (Supabase or local-file fallback, for `predictions`/`drift_runs`), `templates/index.html` (demo page).
 - `tests/` — pytest, API tests use a stub `Detector` (no model/MLflow needed).
-- `data/` — DVC-tracked (`data.dvc`), gitignored. Never commit data, `mlruns/`, `mlflow.db`, `model/`, `reports/`, `.env`.
+- `data/` — DVC pipeline outputs (`dvc.yaml` + `dvc.lock`, no `data.dvc`), gitignored. Dataset download is pinned to a Hugging Face commit in `datadownload.py`. Never commit data, `mlruns/`, `mlflow.db`, `model/`, `reports/`, `.env`.
 
 ## Commands (run from repo root, venv `.venv`)
 - Install: `.venv/Scripts/python.exe -m pip install -r requirements.txt`
 - MLflow registry is shared on DagsHub, no local fallback: `train.py`/`eval.py`/`inference.py` auto-load `.env` (python-dotenv) for `MLFLOW_TRACKING_URI`/`MLFLOW_TRACKING_USERNAME`/`MLFLOW_TRACKING_PASSWORD` (DagsHub token) and fail fast with a clear error if `MLFLOW_TRACKING_URI` is unset. See `.env.example`. (`inference.py`'s `from_dir` path — used by Docker — needs no registry at all.)
 - Pull data: `dvc pull`
+- Full pipeline: `dvc repro` (download → … → eval; skips unchanged stages, `dvc repro --force` reruns all). Eval runs without `--promote`. `validate` exits 1 on bad data and stops the pipeline before training. After a data change: `dvc push`, commit `dvc.lock`.
+- Data version for a model = `split` stage md5 in `dvc.lock` (`train.dvc_md5`), tagged on MLflow runs as `data_dvc_md5`.
 - Train: `python app/train.py`
 - Evaluate and gate: `python app/eval.py [--model N] [--promote]` (exit 1 = gate failed; used by CI)
 - Predict: `python app/inference.py predict "text" --model champion`
