@@ -1,5 +1,6 @@
-# Local dev stack. Airflow omitted for now (not yet implemented in app/); add it here once
-# the retraining DAGs exist. Model must be exported first: see Dockerfile / CLAUDE.md.
+# Local API only. Export the model first (see Dockerfile). .env supplies SUPABASE_URL/SUPABASE_KEY
+# (prediction logging; local JSONL fallback if unset) and PROMPTGUARD_API_KEY.
+# Airflow, Grafana and Postgres run separately: ops/docker-compose.ops.yml (see docs/OPS_GUIDE.md).
 services:
   api:
     build: .

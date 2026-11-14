@@ -1,25 +1,46 @@
-# Deploy to AWS on merge to main. NOT YET ACTIVE: requires the following GitHub Secrets,
-# none of which exist yet (AWS ECR/ECS resources haven't been provisioned):
-#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
-#   ECR_REPOSITORY, ECS_CLUSTER, ECS_SERVICE
-# Also requires a remote MLflow registry reachable from CI (currently local-only), since the
-# model-export step below resolves "champion" from the registry.
-# Intentionally disabled (if: false on the job) until that infra exists, so it doesn't run
-# and show a red X on every push. Flip `if: false` to `if: true` (or remove the line) once
-# the secrets above are set and a remote MLflow registry is reachable from CI.
+# Deploy to Azure after CI passes on main: build the image (with the champion model baked in),
+# push it to Azure Container Registry (ACR), and roll it out to Azure Container Apps.
+#
+# DISABLED (`if: false` on the job) until the Azure resources exist. To enable:
+#   1. Create a resource group, an ACR, and a Container App (ingress on port 8000).
+#   2. Set the app's runtime secrets on the Container App itself (or as Key Vault references),
+#      never in this workflow: SUPABASE_URL, SUPABASE_KEY, PROMPTGUARD_API_KEY.
+#   3. Create an Entra ID app registration with a federated credential for this repo's `main`
+#      branch (OIDC, so no client secret is stored). Give it AcrPush on the ACR and
+#      Contributor on the Container App.
+#   4. Add these repo secrets: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID,
+#      ACR_NAME, AZURE_RESOURCE_GROUP, AZURE_CONTAINERAPP_NAME
+#      (MLFLOW_TRACKING_URI/USERNAME/PASSWORD already exist for CI).
+#   5. Replace `if: false` below with `if: github.event.workflow_run.conclusion == 'success'`.
 name: CD
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
+
+permissions:
+  id-token: write   # OIDC login to Azure
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
     if: false
     runs-on: ubuntu-latest
-    needs: []
+    env:
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+      MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+      IMAGE: ${{ secrets.ACR_NAME }}.azurecr.io/promptguard-api:${{ github.event.workflow_run.head_sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}  # deploy exactly the commit CI tested
 
       - uses: actions/setup-python@v5
         with:
@@ -30,34 +51,36 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Export champion model
-        env:
-          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
         run: python app/inference.py export --model champion --out model/
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Login to ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push image
-        env:
-          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-          IMAGE_TAG: ${{ github.sha }}
+      - name: Build and push image to ACR
         run: |
-          docker build -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" -t "$REGISTRY/$REPOSITORY:latest" .
-          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
-          docker push "$REGISTRY/$REPOSITORY:latest"
+          az acr login --name "${{ secrets.ACR_NAME }}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
 
-      - name: Deploy to ECS
+      - name: Deploy to Azure Container Apps
         run: |
-          aws ecs update-service \
-            --cluster "${{ secrets.ECS_CLUSTER }}" \
-            --service "${{ secrets.ECS_SERVICE }}" \
-            --force-new-deployment
+          az containerapp update \
+            --name "${{ secrets.AZURE_CONTAINERAPP_NAME }}" \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --image "$IMAGE"
+
+      - name: Smoke test /health
+        run: |
+          fqdn=$(az containerapp show \
+            --name "${{ secrets.AZURE_CONTAINERAPP_NAME }}" \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          for i in $(seq 1 30); do
+            if curl -sf "https://$fqdn/health" | grep -q '"status":"ok"'; then exit 0; fi
+            sleep 10
+          done
+          echo "Deployed app never reported healthy"; exit 1

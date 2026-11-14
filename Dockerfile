@@ -1,6 +1,7 @@
-# PromptGuard API image. Expects a pre-exported model at ./model (see README/CLAUDE.md:
+# PromptGuard API image. Expects a pre-exported model at ./model, so the container needs no MLflow
+# access at runtime. Export the champion from the DagsHub registry before building:
 #   python app/inference.py export --model champion --out model/
-# before building, since CI has no remote MLflow to resolve "champion" from yet.
+# CI and CD do the same before `docker build`.
 
 FROM python:3.12-slim AS base
 WORKDIR /app
