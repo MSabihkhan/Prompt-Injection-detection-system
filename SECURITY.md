@@ -30,9 +30,10 @@ SQL). The API's `service_role` key is granted only `select` and `insert` on the 
 be updated or deleted through the API. Enable Row Level Security on every table
 (`alter table <name> enable row level security;`) so the public `anon` key can read nothing.
 
-**Secrets.** Credentials (Supabase key, DagsHub/MLflow token, API key, AWS keys) come only from environment
-variables, a local `.env` file (gitignored), GitHub Actions secrets, or AWS Secrets Manager. Never commit
-them. `.env.example` lists the variable names with empty values.
+**Secrets.** Credentials (Supabase key, DagsHub/MLflow token, API key) come only from environment
+variables, a local `.env` file (gitignored), GitHub Actions secrets, or Azure Key Vault / Container App
+secrets. Never commit them. `.env.example` lists the variable names with empty values. Deployment signs in
+to Azure with OpenID Connect (federated credentials), so no long-lived Azure password is stored in GitHub.
 
 **Model supply chain.** Models are loaded only from the project's own MLflow registry on DagsHub, or from a
 directory exported from it at image build time. A model becomes `champion` only after passing the evaluation

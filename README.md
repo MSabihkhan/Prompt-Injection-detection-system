@@ -92,7 +92,7 @@ app/            data -> preprocess -> split -> train -> eval pipeline; inference
 app/api/        FastAPI service (routes, schemas, auth, store, demo page)
 ops/            Airflow DAGs, drift check, Grafana dashboard, SQL schema, config
 tests/          pytest suite (API tests use a stub model, no registry needed)
-.github/        CI (lint, tests, Docker smoke test) and CD (ECS deploy, currently disabled)
+.github/        CI (lint, tests, Docker smoke test) and CD (Azure Container Apps deploy, currently disabled)
 ```
 
 ## Team
