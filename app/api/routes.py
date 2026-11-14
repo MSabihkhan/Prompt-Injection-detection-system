@@ -1,17 +1,28 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+import logging
+import time
+
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    status,
+)
 
 from .auth import require_api_key
-from .feedback_store import make_feedback_row
 from .schemas import (
     ClassifyBatchRequest,
     ClassifyBatchResponse,
     ClassifyRequest,
     ClassifyResponse,
-    FeedbackRequest,
-    FeedbackResponse,
+    DriftResponse,
     HealthResponse,
 )
+from .store import make_prediction_row
 
+logger = logging.getLogger("promptguard.api")
 router = APIRouter()
 
 
@@ -26,6 +37,24 @@ def _require_detector(request: Request):
     return det
 
 
+def _classify(det, texts: list[str], endpoint: str, request: Request, tasks: BackgroundTasks) -> list[dict]:
+    t0 = time.perf_counter()
+    results = det.predict(texts)
+    per_text_ms = (time.perf_counter() - t0) * 1000 / len(texts)
+    rows = [make_prediction_row(endpoint, t, r, det.threshold, det.meta.get("version"), per_text_ms)
+            for t, r in zip(texts, results)]
+    tasks.add_task(_log_predictions, request.app.state.store, rows)
+    return results
+
+
+def _log_predictions(store, rows: list[dict]) -> None:
+    # Runs after the response is sent; monitoring must never break or slow classification.
+    try:
+        store.insert("predictions", rows)
+    except Exception:
+        logger.exception("Failed to log %d prediction(s)", len(rows))
+
+
 @router.get("/health", response_model=HealthResponse)
 def health(request: Request):
     det = request.app.state.detector
@@ -36,21 +65,19 @@ def health(request: Request):
 
 
 @router.post("/classify", response_model=ClassifyResponse, dependencies=[Depends(require_api_key)])
-def classify(body: ClassifyRequest, request: Request):
+def classify(body: ClassifyRequest, request: Request, tasks: BackgroundTasks):
     det = _require_detector(request)
-    result = det.predict(body.text)[0]
+    result = _classify(det, [body.text], "classify", request, tasks)[0]
     return _to_response(result, det)
 
 
 @router.post("/classify/batch", response_model=ClassifyBatchResponse, dependencies=[Depends(require_api_key)])
-def classify_batch(body: ClassifyBatchRequest, request: Request):
+def classify_batch(body: ClassifyBatchRequest, request: Request, tasks: BackgroundTasks):
     det = _require_detector(request)
-    results = det.predict(body.texts)
+    results = _classify(det, body.texts, "classify_batch", request, tasks)
     return ClassifyBatchResponse(results=[_to_response(r, det) for r in results])
 
 
-@router.post("/feedback", response_model=FeedbackResponse, dependencies=[Depends(require_api_key)])
-def feedback(body: FeedbackRequest, request: Request):
-    row = make_feedback_row(body.text, body.predicted_label, body.correct_label, body.model_version)
-    request.app.state.feedback_store.record(row)
-    return FeedbackResponse()
+@router.get("/drift", response_model=DriftResponse, dependencies=[Depends(require_api_key)])
+def drift(request: Request, limit: int = Query(10, ge=1, le=100)):
+    return DriftResponse(runs=request.app.state.store.recent("drift_runs", limit))

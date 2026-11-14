@@ -7,7 +7,7 @@ Python 3.12 (proposal says 3.11; actual venv/Docker base is 3.12 — numpy==2.5.
 
 ## Layout
 - `app/` — pipeline scripts: `datadownload.py` → `preprocess.py` → `split.py` → `train.py` → `eval.py`; `inference.py` loads/exports the model.
-- `app/api/` — FastAPI service: `main.py` (app + lifespan model load), `routes.py`, `schemas.py`, `auth.py`, `feedback_store.py` (Supabase or local-file fallback), `templates/index.html` (demo page).
+- `app/api/` — FastAPI service: `main.py` (app + lifespan model load), `routes.py`, `schemas.py`, `auth.py`, `store.py` (Supabase or local-file fallback, for `predictions`/`drift_runs`), `templates/index.html` (demo page).
 - `tests/` — pytest, API tests use a stub `Detector` (no model/MLflow needed).
 - `data/` — DVC-tracked (`data.dvc`), gitignored. Never commit data, `mlruns/`, `mlflow.db`, `model/`, `reports/`, `.env`.
 
@@ -32,7 +32,7 @@ Python 3.12 (proposal says 3.11; actual venv/Docker base is 3.12 — numpy==2.5.
 - Scope: English, direct prompts, binary labels, CPU serving. No multi-class, GPU, or output scanning.
 
 ## API (built)
-`POST /classify`, `POST /classify/batch`, `POST /feedback`, `GET /health`, Jinja2 demo page. API key via `X-API-Key` (off if `PROMPTGUARD_API_KEY` unset). Feedback → Supabase (`supabase/schema.sql`) or local-file fallback. Metrics/dashboards → Grafana (not yet built).
+`POST /classify`, `POST /classify/batch`, `GET /drift?limit=N`, `GET /health`, Jinja2 demo page (classify only). API key via `X-API-Key` (off if `PROMPTGUARD_API_KEY` unset). Tables in `ops/sql/001_schema.sql`: classify endpoints log one `predictions` row per text (length/score/latency, never the text) in a background task that can't fail the request; `/drift` reads `drift_runs` (written by the Airflow drift DAG). Backend: Supabase, or JSONL files in `reports/` if unset. Supabase needs explicit `grant select, insert` to `service_role` on each table + its `_id_seq`. Dashboards → Grafana (`ops/grafana/`).
 
 ## Docker / CI-CD
 - `Dockerfile`: python:3.12-slim, expects a pre-exported `model/` dir (run `python app/inference.py export --model champion --out model/` before `docker build`).
